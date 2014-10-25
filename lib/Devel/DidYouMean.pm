@@ -31,9 +31,29 @@ Or add as a one liner:
     $ perl -Ilib -mData::Dumper -MDevel::DidYouMean -e 'Data::Dumper::Dumpr($data)'
     Undefined subroutine 'Dumpr' not found in Data::Dumper. Did you mean Dumper? at -e line 1.
 
+
+Maybe trap the error and extract the matching subs for something else
+
+    use Try::Tiny;
+
+    try
+    {
+        sprintX("", $text); # boom
+    }
+    catch
+    {
+        my $error_msg = $_;
+        my @closest_matching_subs = @$Devel::DidYouMean::DYM_MATCHING_SUBS;
+        ...
+    }
+
 =head2 DESCRIPTION
 
-L<Devel::DidYouMean> intercepts failed function and method calls, suggesting the nearest matching available function or method in the context in which the erroneous function call was made. This library is experimental, on load it exports an AUTOLOAD subroutine to every namespace in the symbol table. Therefore it should be loaded last in your program, preferably using C<require>.
+L<Devel::DidYouMean> intercepts failed function and method calls, suggesting the nearest matching available subroutines in the context in which the erroneous function call was made.
+
+=head2 WARNING
+
+This library is experimental, on load it exports an AUTOLOAD subroutine to every namespace in the symbol table. Therefore it should be loaded last in your program, preferably using C<require>.
 
 =cut
 
@@ -43,7 +63,13 @@ This module was inspired by Yuki Nishijima's Ruby gem L<did_you_mean|https://git
 
 =cut
 
-our $DYM_MATCHING_SUB = undef;
+=head2 SEE ALSO
+
+L<Symbol::Approx::Sub> is a similar module that catches invalid subroutine names and then executes the nearest matching subroutine it can find. It does not export AUTOLOAD to all namespaces in the symbol table.
+
+=cut
+
+our $DYM_MATCHING_SUBS = [];
 
 # add main
 *{ main::AUTOLOAD } = Devel::DidYouMean::AUTOLOAD;
@@ -302,12 +328,13 @@ x
 xor
 y/;
 
-sub AUTOLOAD {
-    require Text::Levenshtein;
-
+sub AUTOLOAD
+{
     my @sub_path = split /::/, $AUTOLOAD;
     my $sub = pop @sub_path;
-    return if $sub eq 'DESTROY';
+
+    # ignore these calls
+    return if grep /$sub/, qw/AUTOLOAD BEGIN CHECK INIT DESTROY END/;
 
     my $package = join '::', @sub_path;
     my $package_namespace = $package . '::';
@@ -332,11 +359,21 @@ sub AUTOLOAD {
         }
     }
 
+    $DYM_MATCHING_SUBS = [];
+    my $match_score;
+
+    # return similarly named functions
     for (sort { $valid_subs{$a} <=> $valid_subs{$b} } keys %valid_subs)
     {
         next if $_ eq 'AUTOLOAD';
-        $DYM_MATCHING_SUB = $_;
-        croak "Undefined subroutine '$sub' not found in $package. Did you mean $_?";
+        $match_score = $valid_subs{$_} unless $match_score;
+
+        if ($match_score < $valid_subs{$_})
+        {
+            croak "Undefined subroutine '$sub' not found in $package. Did you mean " 
+                . join(', ', @$DYM_MATCHING_SUBS) . '?';
+        }
+        push @$DYM_MATCHING_SUBS, $_;
     }
 }
 

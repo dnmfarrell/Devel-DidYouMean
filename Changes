@@ -1,5 +1,9 @@
 Revision history for Devel::DidYouMean
 
+0.02    2014-10-25
+        - Changed method to return list of matching subs in case there is more than one "best" match
+        - Added code to ignore sub calls for INIT, DESTROY etc
+
 0.01    2014-10-25
         - Initial experimental build
 

@@ -8,7 +8,7 @@ Devel::DidYouMean - Intercepts failed function and method calls, suggesting the 
 
 =head1 VERSION
 
-version 0.01
+version 0.02
 
 =head2 SYNOPSIS
 
@@ -30,13 +30,36 @@ Or add as a one liner:
     $ perl -Ilib -mData::Dumper -MDevel::DidYouMean -e 'Data::Dumper::Dumpr($data)'
     Undefined subroutine 'Dumpr' not found in Data::Dumper. Did you mean Dumper? at -e line 1.
 
+Maybe trap the error and extract the matching subs for something else
+
+    use Try::Tiny;
+
+    try
+    {
+        sprintX("", $text); # boom
+    }
+    catch
+    {
+        my $error_msg = $_;
+        my @closest_matching_subs = @$Devel::DidYouMean::DYM_MATCHING_SUBS;
+        ...
+    }
+
 =head2 DESCRIPTION
 
-L<Devel::DidYouMean> intercepts failed function and method calls, suggesting the nearest matching available function or method in the context in which the erroneous function call was made. This library is experimental, on load it exports an AUTOLOAD subroutine to every namespace in the symbol table. Therefore it should be loaded last in your program, preferably using C<require>.
+L<Devel::DidYouMean> intercepts failed function and method calls, suggesting the nearest matching available subroutines in the context in which the erroneous function call was made.
+
+=head2 WARNING
+
+This library is experimental, on load it exports an AUTOLOAD subroutine to every namespace in the symbol table. Therefore it should be loaded last in your program, preferably using C<require>.
 
 =head2 THANKS
 
 This module was inspired by Yuki Nishijima's Ruby gem L<did_you_mean|https://github.com/yuki24/did_you_mean>.
+
+=head2 SEE ALSO
+
+L<Symbol::Approx::Sub> is a similar module that catches invalid subroutine names and then executes the nearest matching subroutine it can find. It does not export AUTOLOAD to all namespaces in the symbol table.
 
 =head1 AUTHOR
 
