@@ -1,0 +1,51 @@
+=pod
+
+=encoding UTF-8
+
+=head1 NAME
+
+Devel::DidYouMean - Intercepts failed function and method calls, suggesting the nearest matching alternative.
+
+=head1 VERSION
+
+version 0.01
+
+=head2 SYNOPSIS
+    #!/usr/bin/env perl
+    # somescript.pl
+    use Data::Dumper;
+    require Devel::DidYouMean;
+
+    print Dumpr($data); # wrong function name
+    ...
+
+*Run the code*
+
+    $ somescript.pl
+    Undefined subroutine 'Dumpr' not found in main. Did you mean Dumper? at somescript.pl line 6.
+
+Or add as a one liner:
+
+    $ perl -Ilib -mData::Dumper -MDevel::DidYouMean -e 'Data::Dumper::Dumpr($data)'
+    Undefined subroutine 'Dumpr' not found in Data::Dumper. Did you mean Dumper? at -e line 1.
+
+=head2 DESCRIPTION
+
+L<Devel::DidYouMean> intercepts failed function and method calls, suggesting the nearest matching available function or method in the context in which the erroneous function call was made. This library is experimental, on load it exports an AUTOLOAD subroutine to every namespace in the symbol table. Therefore it should be loaded last in your program, preferably using C<require>.
+
+=head2 THANKS
+
+This module was inspired by Yuki Nishijima's Ruby gem L<did_you_mean|https://github.com/yuki24/did_you_mean>.
+
+=head1 AUTHOR
+
+David Farrell <sillymoos@cpan.org>
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2014 by David Farrell.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=cut
