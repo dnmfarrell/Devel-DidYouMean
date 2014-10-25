@@ -12,6 +12,7 @@ no strict qw/refs subs/;
 # ABSTRACT: Intercepts failed function and method calls, suggesting the nearest matching alternative.
 
 =head2 SYNOPSIS
+
     #!/usr/bin/env perl
     # somescript.pl
     use Data::Dumper;

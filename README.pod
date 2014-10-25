@@ -11,6 +11,7 @@ Devel::DidYouMean - Intercepts failed function and method calls, suggesting the 
 version 0.01
 
 =head2 SYNOPSIS
+
     #!/usr/bin/env perl
     # somescript.pl
     use Data::Dumper;
