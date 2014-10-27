@@ -1,4 +1,5 @@
 requires "Carp" => "0";
+requires "Perl::Builtins" => "0";
 requires "Text::Levenshtein" => "0";
 requires "feature" => "0";
 requires "strict" => "0";

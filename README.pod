@@ -8,30 +8,31 @@ Devel::DidYouMean - Intercepts failed function and method calls, suggesting the 
 
 =head1 VERSION
 
-version 0.02
+version 0.03
 
 =head2 SYNOPSIS
 
     #!/usr/bin/env perl
+
     # somescript.pl
     use Data::Dumper;
-    require Devel::DidYouMean;
+    use Devel::DidYouMean;
 
     print Dumpr($data); # wrong function name
-    ...
 
 *Run the code*
 
     $ somescript.pl
-    Undefined subroutine 'Dumpr' not found in main. Did you mean Dumper? at somescript.pl line 6.
+    Undefined subroutine 'Dumpr' not found in main. Did you mean Dumper? at somescript.pl line 7.
 
-Or add as a one liner:
+Or as a one liner:
 
-    $ perl -Ilib -mData::Dumper -MDevel::DidYouMean -e 'Data::Dumper::Dumpr($data)'
-    Undefined subroutine 'Dumpr' not found in Data::Dumper. Did you mean Dumper? at -e line 1.
+    $ perl -MData::Dumper -MDevel::DidYouMean -e 'print Dumpr($data)'
+    Undefined subroutine 'Dumpr' not found in main. Did you mean Dumper? at -e line 1.
 
-Maybe trap the error and extract the matching subs for something else
+Or trap the error and extract the matching subs
 
+    use Devel::DidYouMean;
     use Try::Tiny;
 
     try
@@ -42,7 +43,8 @@ Maybe trap the error and extract the matching subs for something else
     {
         my $error_msg = $_;
         my @closest_matching_subs = @$Devel::DidYouMean::DYM_MATCHING_SUBS;
-        ...
+
+        # do something cool here
     }
 
 =head2 DESCRIPTION
@@ -51,7 +53,7 @@ L<Devel::DidYouMean> intercepts failed function and method calls, suggesting the
 
 =head2 WARNING
 
-This library is experimental, on load it exports an AUTOLOAD subroutine to every namespace in the symbol table. Therefore it should be loaded last in your program, preferably using C<require>.
+This library is experimental, on load it exports an AUTOLOAD subroutine to every namespace in the symbol table. In version 0.03 and higher, this library must be loaded using C<use> and not C<require>.
 
 =head2 THANKS
 
