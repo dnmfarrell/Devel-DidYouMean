@@ -1,8 +1,7 @@
-use strict;
+use 5.008;
 use warnings;
 package Devel::DidYouMean;
 
-use feature 'say';
 use vars qw($AUTOLOAD);
 use Text::Levenshtein;
 use Perl::Builtins;
@@ -55,13 +54,15 @@ L<Devel::DidYouMean> intercepts failed function and method calls, suggesting the
 
 =head2 WARNING
 
-This library is experimental, on load it exports an AUTOLOAD subroutine to every namespace in the symbol table. In version 0.03 and higher, this library must be loaded using C<use> and not C<require>.
+This library is experimental, on load it exports an AUTOLOAD subroutine to every namespace in the symbol table. In version 0.03 and higher, this library must be loaded using C<use> and not C<require>. In version 0.04 and higher it will not overwrite an existing AUTOLOAD in a namespace.
 
 =cut
 
 =head2 THANKS
 
 This module was inspired by Yuki Nishijima's Ruby gem L<did_you_mean|https://github.com/yuki24/did_you_mean>.
+
+Chapter 9 "Dynamic Subroutines" in L<Mastering Perl|http://shop.oreilly.com/product/0636920012702.do> second edition by brian d foy was a vital reference for understanding Perl's symbol tables.
 
 =cut
 
@@ -81,12 +82,14 @@ CHECK {
     # add to every other module in memory
     for (keys %INC)
     {
-        my $module = $_ =~ s/\//::/gr;
+        my $module = $_;
+        $module =~ s/\//::/g;
         $module = substr($module, 0, -3);
-
-        next if $module eq __PACKAGE__;
-
         $module .= '::AUTOLOAD';
+        
+        # skip if the package already has an autoload
+        next if defined *{ $module };
+        
         *{ $module } = Devel::DidYouMean::AUTOLOAD;
     }
 }
