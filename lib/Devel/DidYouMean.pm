@@ -1,13 +1,10 @@
 use 5.008;
+use strict;
 use warnings;
 package Devel::DidYouMean;
 
-use vars qw($AUTOLOAD);
 use Text::Levenshtein;
 use Perl::Builtins;
-use Carp 'croak';
-no warnings 'once';
-no strict qw/refs subs/;
 
 # ABSTRACT: Intercepts failed function and method calls, suggesting the nearest matching alternative.
 
@@ -24,12 +21,14 @@ no strict qw/refs subs/;
 *Run the code*
 
     $ somescript.pl
-    Undefined subroutine 'Dumpr' not found in main. Did you mean Dumper? at somescript.pl line 7.
+    Undefined subroutine &main::Dumpr called at somescript.pl line 7.
+    Did you mean Dumper?
 
 Or as a one liner:
 
     $ perl -MData::Dumper -MDevel::DidYouMean -e 'print Dumpr($data)'
-    Undefined subroutine 'Dumpr' not found in main. Did you mean Dumper? at -e line 1.
+    Undefined subroutine &main::Dumpr called at -e line 1.
+    Did you mean Dumper?
 
 Or trap the error and extract the matching subs
 
@@ -52,59 +51,52 @@ Or trap the error and extract the matching subs
 
 L<Devel::DidYouMean> intercepts failed function and method calls, suggesting the nearest matching available subroutines in the context in which the erroneous function call was made.
 
-=head2 WARNING
-
-This library is experimental, on load it exports an AUTOLOAD subroutine to every namespace in the symbol table. In version 0.03 and higher, this library must be loaded using C<use> and not C<require>. In version 0.04 and higher it will not overwrite an existing AUTOLOAD in a namespace.
-
-=cut
-
 =head2 THANKS
 
 This module was inspired by Yuki Nishijima's Ruby gem L<did_you_mean|https://github.com/yuki24/did_you_mean>.
 
 Chapter 9 "Dynamic Subroutines" in L<Mastering Perl|http://shop.oreilly.com/product/0636920012702.do> second edition by brian d foy was a vital reference for understanding Perl's symbol tables.
 
-=cut
+tipdbmp on L<reddit|http://www.reddit.com/r/perl/comments/2kw4g9/implementing_did_you_mean_in_perl/> for pointing me in the direction of signal handling instead of the previous AUTOLOAD approach.
 
 =head2 SEE ALSO
 
 L<Symbol::Approx::Sub> is a similar module that catches invalid subroutine names and then executes the nearest matching subroutine it can find. It does not export AUTOLOAD to all namespaces in the symbol table.
 
+Mark Jason Dominus' 2014 !!Con L<talk|http://perl.plover.com/yak/HelpHelp/> and 2008 blog L<post|http://blog.plover.com/prog/perl/Help.pm.html> about a similar function.
+
 =cut
 
 our $DYM_MATCHING_SUBS = [];
 
-CHECK {
+$SIG{__DIE__} = sub {
 
-    # add autoload to main
-    *{ main::AUTOLOAD } = Devel::DidYouMean::AUTOLOAD;
+    no strict qw/refs/;
+    my ($error, $package, $sub_name, $new_error) = @_;
 
-    # add to every other module in memory
-    for (keys %INC)
+    my $undef_sub = qr/^Undefined subroutine &(.+?) called (at .+?\.)/;
+    my $missing_method = qr/^Can't locate object method "(.+?)" via package "(.+?)" (at .+?\.)/;
+
+    if ($error =~ /$undef_sub/)
     {
-        my $module = $_;
-        $module =~ s/\//::/g;
-        $module = substr($module, 0, -3);
-        $module .= '::AUTOLOAD';
-        
-        # skip if the package already has an autoload
-        next if defined *{ $module };
-        
-        *{ $module } = Devel::DidYouMean::AUTOLOAD;
+        my @sub_path = split /::/, $1;
+        $sub_name = pop @sub_path;
+        $package = join '::', @sub_path;
+        $new_error = $2;
     }
-}
+    elsif ($error =~ /$missing_method/)
+    {
+        $sub_name = $1;
+        $package = $2;
+        $new_error = $3;
+    }
+    else
+    {
+        print "No match\n";
+        return undef;
+    }
 
-sub AUTOLOAD
-{
-    my @sub_path = split /::/, $AUTOLOAD;
-    my $sub = pop @sub_path;
-
-    # ignore these calls
-    return if grep /$sub/, qw/AUTOLOAD BEGIN CHECK INIT DESTROY END/;
-
-    my $package = join '::', @sub_path;
     my $package_namespace = $package . '::';
-
     my %valid_subs = ();
 
     for (keys %$package_namespace)
@@ -112,7 +104,7 @@ sub AUTOLOAD
         my $absolute_name = $package_namespace . $_;
         if (defined &{$absolute_name})
         {
-            $valid_subs{$_} = Text::Levenshtein::fastdistance($sub, $_);
+            $valid_subs{$_} = Text::Levenshtein::fastdistance($sub_name, $_);
         }
     }
 
@@ -121,7 +113,7 @@ sub AUTOLOAD
     {
         for (Perl::Builtins::list)
         {
-            $valid_subs{$_} = Text::Levenshtein::fastdistance($sub, $_);
+            $valid_subs{$_} = Text::Levenshtein::fastdistance($sub_name, $_);
         }
     }
 
@@ -131,16 +123,14 @@ sub AUTOLOAD
     # return similarly named functions
     for (sort { $valid_subs{$a} <=> $valid_subs{$b} } keys %valid_subs)
     {
-        next if $_ eq 'AUTOLOAD';
         $match_score = $valid_subs{$_} unless $match_score;
 
         if ($match_score < $valid_subs{$_})
         {
-            croak "Undefined subroutine '$sub' not found in $package. Did you mean " 
-                . join(', ', @$DYM_MATCHING_SUBS) . '?';
+            die $error . "Did you mean " . join(', ', @$DYM_MATCHING_SUBS) . "?\n";
         }
         push @$DYM_MATCHING_SUBS, $_;
     }
-}
+};
 
 1;

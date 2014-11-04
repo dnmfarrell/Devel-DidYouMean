@@ -1,9 +1,7 @@
-requires "Carp" => "0";
 requires "Perl::Builtins" => "0";
 requires "Text::Levenshtein" => "0";
-requires "feature" => "0";
+requires "perl" => "5.008";
 requires "strict" => "0";
-requires "vars" => "0";
 requires "warnings" => "0";
 
 on 'test' => sub {
