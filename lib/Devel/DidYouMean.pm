@@ -1,9 +1,10 @@
 use 5.008;
 use strict;
 use warnings;
+
 package Devel::DidYouMean;
 
-use Text::Levenshtein;
+use Text::Levenshtein::Damerau::XS qw/xs_edistance/;
 use Perl::Builtins;
 
 # ABSTRACT: Intercepts failed function and method calls, suggesting the nearest matching alternative.
@@ -67,8 +68,6 @@ Mark Jason Dominus' 2014 !!Con L<talk|http://perl.plover.com/yak/HelpHelp/> and 
 
 =cut
 
-our $DYM_MATCHING_SUBS = [];
-
 $SIG{__DIE__} = sub {
 
     no strict qw/refs/;
@@ -120,11 +119,10 @@ $SIG{__DIE__} = sub {
     # return similarly named functions
 
     my ($match_score) = sort { $a <=> $b } keys %valid_subs;
-    $DYM_MATCHING_SUBS = $valid_subs{ $match_score };
 
-    die sprintf("%sDid you mean %s?\n",
-        $error,
-        join(', ', @$DYM_MATCHING_SUBS)
+    die Devel::DidYouMean::Exception->new(
+        error => $error,
+        suggestions => $valid_subs{ $match_score },
     );
 };
 
@@ -133,9 +131,46 @@ sub add_matching {
     my $sub_name = shift;
     my $candidate = shift;
 
-    my $dist = Text::Levenshtein::fastdistance($sub_name, $candidate);
+    my $dist = xs_edistance($sub_name, $candidate);
     push @{ $valid_subs->{$dist} }, $candidate;
     return;
 }
+
+package Devel::DidYouMean::Exception;
+
+use overload q{""} => \&to_string;
+
+sub new {
+    my $class = shift;
+    my $self = {
+        error => undef,
+        suggestions => undef,
+        @_,
+    };
+    bless $self => $class;
+}
+
+sub to_string {
+    my $self = shift;
+    my $suggestions = $self->suggestions;
+    my $n = @{ $suggestions };
+
+    my $m = [
+        [ "%s\n", sub { } ],
+        [ "%sDid you mean %s?\n", sub { @$suggestions } ],
+        [ "%sDid you mean %s or %s?\n", sub { @$suggestions } ],
+        [ "%sDid you mean %s, or %s?\n",
+            sub {
+                join(', ', @{ $suggestions }[0, ($n - 2)]),
+                $suggestions->[-1]
+            } ],
+    ]->[ ($n > 2) ? -1 : $n ];
+
+    sprintf $m->[0], $self->error, $m->[-1]->();
+}
+
+sub error { $_[0]->{error} }
+
+sub suggestions { $_[0]->{suggestions} }
 
 1;
