@@ -99,38 +99,43 @@ $SIG{__DIE__} = sub {
     my $package_namespace = $package . '::';
     my %valid_subs = ();
 
-    for (keys %$package_namespace)
+    for my $candidate (keys %$package_namespace)
     {
-        my $absolute_name = $package_namespace . $_;
+        my $absolute_name = $package_namespace . $candidate;
         if (defined &{$absolute_name})
         {
-            $valid_subs{$_} = Text::Levenshtein::fastdistance($sub_name, $_);
+            add_matching(\%valid_subs, $sub_name, $candidate);
         }
-    }
+   }
 
     # if package is main, add in builtin functions
     if ($package eq 'main')
     {
-        for (Perl::Builtins::list)
+        for my $candidate (Perl::Builtins::list)
         {
-            $valid_subs{$_} = Text::Levenshtein::fastdistance($sub_name, $_);
+            add_matching(\%valid_subs, $sub_name, $candidate);
         }
     }
-
-    $DYM_MATCHING_SUBS = [];
-    my $match_score;
 
     # return similarly named functions
-    for (sort { $valid_subs{$a} <=> $valid_subs{$b} } keys %valid_subs)
-    {
-        $match_score = $valid_subs{$_} unless $match_score;
 
-        if ($match_score < $valid_subs{$_})
-        {
-            die $error . "Did you mean " . join(', ', @$DYM_MATCHING_SUBS) . "?\n";
-        }
-        push @$DYM_MATCHING_SUBS, $_;
-    }
+    my ($match_score) = sort { $a <=> $b } keys %valid_subs;
+    $DYM_MATCHING_SUBS = $valid_subs{ $match_score };
+
+    die sprintf("%sDid you mean %s?\n",
+        $error,
+        join(', ', @$DYM_MATCHING_SUBS)
+    );
 };
+
+sub add_matching {
+    my $valid_subs = shift;
+    my $sub_name = shift;
+    my $candidate = shift;
+
+    my $dist = Text::Levenshtein::fastdistance($sub_name, $candidate);
+    push @{ $valid_subs->{$dist} }, $candidate;
+    return;
+}
 
 1;
