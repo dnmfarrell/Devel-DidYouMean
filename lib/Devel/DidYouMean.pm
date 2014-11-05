@@ -1,9 +1,10 @@
 use 5.008;
 use strict;
 use warnings;
+
 package Devel::DidYouMean;
 
-use Text::Levenshtein;
+use Text::Levenshtein::Damerau::XS qw/xs_edistance/;
 use Perl::Builtins;
 
 # ABSTRACT: Intercepts failed function and method calls, suggesting the nearest matching alternative.
@@ -121,7 +122,7 @@ $SIG{__DIE__} = sub {
 
     die Devel::DidYouMean::Exception->new(
         error => $error,
-        didyoumean => $valid_subs{ $match_score },
+        suggestions => $valid_subs{ $match_score },
     );
 };
 
@@ -130,7 +131,7 @@ sub add_matching {
     my $sub_name = shift;
     my $candidate = shift;
 
-    my $dist = Text::Levenshtein::fastdistance($sub_name, $candidate);
+    my $dist = xs_edistance($sub_name, $candidate);
     push @{ $valid_subs->{$dist} }, $candidate;
     return;
 }
@@ -143,7 +144,7 @@ sub new {
     my $class = shift;
     my $self = {
         error => undef,
-        didyoumean => undef,
+        suggestions => undef,
         @_,
     };
     bless $self => $class;
@@ -151,12 +152,25 @@ sub new {
 
 sub to_string {
     my $self = shift;
-    sprintf "%sDid you mean %s?\n", $self->error, join(', ', @{ $self->didyoumean });
+    my $suggestions = $self->suggestions;
+    my $n = @{ $suggestions };
+
+    my $m = [
+        [ "%s\n", sub { } ],
+        [ "%sDid you mean %s?\n", sub { @$suggestions } ],
+        [ "%sDid you mean %s or %s?\n", sub { @$suggestions } ],
+        [ "%sDid you mean %s, or %s?\n",
+            sub {
+                join(', ', @{ $suggestions }[0, ($n - 2)]),
+                $suggestions->[-1]
+            } ],
+    ]->[ ($n > 2) ? -1 : $n ];
+
+    sprintf $m->[0], $self->error, $m->[-1]->();
 }
 
 sub error { $_[0]->{error} }
 
-sub didyoumean { $_[0]->{didyoumean} }
-
+sub suggestions { $_[0]->{suggestions} }
 
 1;
